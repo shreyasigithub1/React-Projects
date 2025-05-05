@@ -1,0 +1,15 @@
+.cardLight {
+  background-color: rgb(215, 235, 181);
+  border: 1px solid green;
+  color: rgb(43, 65, 8);
+  width:20%;
+  text-align: center;
+}
+
+.cardDark {
+  background-color: rgb(43, 65, 8);
+  border: 1px solid rgb(150, 226, 150);
+  color: rgb(215, 235, 181);
+  width:20%;
+  text-align: center;
+}
