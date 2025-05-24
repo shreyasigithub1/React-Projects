@@ -1,16 +1,42 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useReducer } from "react";
 import styles from "./TaskManager.module.css";
+
+function reducer(state, action) {
+  switch (action.type) {
+    case "Add":
+      return {
+        ...state,
+        taskArray: [...state.taskArray, action.payload], //[{formData:...},{formData:...},{formData:...},{formData:...}]
+      };
+    case "Delete":
+      const newTaskArray = state.taskArray.filter(
+        (_, i) => i !== action.payload
+      );
+      return {
+        ...state,
+        taskArray: newTaskArray,
+      };
+    case "Update":
+      const updatedTasks = state.taskArray.map((task, index) =>
+        index === action.payload.index
+          ? { formData: action.payload.formData }
+          : task
+      );
+      return {
+        ...state,
+        taskArray: updatedTasks,
+      };
+    default:
+      return state;
+  }
+}
 
 export default function TaskManager() {
   //State variables
-
+  const [updateIndex, setUpdateIndex] = useState(null);
   const [willUpdate, setWillUpdate] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [hour, setHour] = useState(0);
-  const [minute, setMinute] = useState(0);
   const [alertMessage, setAlertMessage] = useState("");
-  //useRef
-  const inputRef = useRef(null);
+
   let [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     tag: "work",
@@ -21,53 +47,58 @@ export default function TaskManager() {
       minute: 0,
     },
   });
-  const [taskArray, setTaskArray] = useState([]);
+
+  //useRef
+  const inputRef = useRef(null);
   //useEffect
   useEffect(() => {
     inputRef.current.focus();
   }, []);
+  //useReducer
+  const [state, dispatch] = useReducer(reducer, { taskArray: [] });
+
+  //Validate Form
+  function validateForm(formData) {
+    if (!formData.title.trim()) return "No title added";
+    if (!formData.description.trim()) return "No description added";
+    if (
+      parseInt(formData.duration.hour) === 0 &&
+      parseInt(formData.duration.minute) === 0
+    )
+      return "No duration added";
+    return null;
+  }
 
   //Function submit the form
   function handleSubmit(e) {
     e.preventDefault();
     setWillUpdate(false);
 
-    if (formData.title == "") {
-      setAlertMessage("No title added");
-      setTimeout(() => {
-        setAlertMessage("");
-      }, 2000);
+    const error = validateForm(formData);
+    if (error) {
+      setAlertMessage(error);
+      setTimeout(() => setAlertMessage(""), 2000);
       return;
     }
 
-    if (formData.description == "") {
-      setAlertMessage("No description added");
-      setTimeout(() => {
-        setAlertMessage("");
-      }, 2000);
+    if (willUpdate && updateIndex !== null) {
+      dispatch({
+        type: "Update",
+        payload: {
+          index: updateIndex,
+          formData,
+        },
+      });
+      setUpdateIndex(null);
+    } else {
+      dispatch({
+        type: "Add",
+        payload: { formData },
+      });
     }
-    if (formData.duration.hour == 0 && formData.duration.minute == 0) {
-      setAlertMessage("No duration  added");
-      setTimeout(() => {
-        setAlertMessage("");
-      }, 2000);
-    }
-    if (
-      formData.duration.hour == 0 &&
-      formData.duration.minute == 0 &&
-      formData.description == ""
-    ) {
-      setAlertMessage("No duration and description added");
-      setTimeout(() => {
-        setAlertMessage("");
-      }, 2000);
-    }
-    setTaskArray([...taskArray, { formData }]);
 
-    console.log(taskArray);
-    setDate(new Date().toISOString().split("T")[0]);
-    setHour(0);
-    setMinute(0);
+    setWillUpdate(false);
+
     setFormData({
       date: new Date().toISOString().split("T")[0],
       tag: "work",
@@ -81,30 +112,20 @@ export default function TaskManager() {
   }
   //Function to delete task
   function handleDelete(index) {
-    const newTaskArray = taskArray.filter((_, i) => i !== index);
-    setTaskArray(newTaskArray);
+    dispatch({
+      type: "Delete",
+      payload: index,
+    });
   }
   //Function to update task
   function handleUpdate(index) {
-    const task = taskArray[index];
-    const updatedForm = {
-      date: task.formData.date,
-      tag: task.formData.tag,
-      title: task.formData.title,
-      description: task.formData.description,
-      duration: {
-        hour: task.formData.duration.hour,
-        minute: task.formData.duration.minute,
-      },
-    };
-    setFormData(updatedForm); //Now value of formData will be updateForm
-    setDate(task.formData.date);
-    setHour(task.formData.duration.hour);
-    setMinute(task.formData.duration.minute);
-    const newTaskArray = taskArray.filter((_, i) => i !== index); //The previous task will be deleted now
-    setTaskArray(newTaskArray);
+    const task = state.taskArray[index];
+    setFormData({ ...task.formData });
+
+    setUpdateIndex(index);
     setWillUpdate(true);
   }
+
   return (
     <>
       {/* Today's date */}
@@ -121,9 +142,8 @@ export default function TaskManager() {
           <input
             type="date"
             id="date"
-            value={date}
+            value={formData.date}
             onChange={(e) => {
-              setDate(e.target.value);
               setFormData({ ...formData, date: e.target.value });
             }}
           />
@@ -201,9 +221,8 @@ export default function TaskManager() {
             <select
               id="hour"
               name="hour"
-              value={hour}
+              value={formData.duration.hour}
               onChange={(e) => {
-                setHour(e.target.value);
                 setFormData({
                   ...formData,
                   duration: { ...formData.duration, hour: e.target.value },
@@ -225,9 +244,8 @@ export default function TaskManager() {
             <select
               id="minute"
               name="minute"
-              value={minute}
+              value={formData.duration.minute}
               onChange={(e) => {
-                setMinute(e.target.value);
                 setFormData({
                   ...formData,
                   duration: { ...formData.duration, minute: e.target.value },
@@ -252,7 +270,7 @@ export default function TaskManager() {
       </form>
       {/* The Task List */}
 
-      {taskArray
+      {state.taskArray
         .sort((a, b) => {
           const dateA = new Date(a.formData.date).getTime();
           const dateB = new Date(b.formData.date).getTime();
